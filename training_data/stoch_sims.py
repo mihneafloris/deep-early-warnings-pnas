@@ -13,6 +13,7 @@ Ouptut time-series of ts_len time units prior to transition
 
 """
 
+import sys
 import numpy as np
 import pandas as pd
 import csv
@@ -21,7 +22,7 @@ import os
 # Function to convert b.out files into readable form
 from convert_bifdata import convert_bifdata
 
-    
+
 # Function to simulate model
 from sim_model import sim_model
 
@@ -33,7 +34,7 @@ from trans_detect import trans_detect
 # Create model class
 class Model():
     pass
- 
+
 
 # Create directory if does not exist
 if not os.path.exists('output_sims'):
@@ -44,7 +45,6 @@ if not os.path.exists('output_counts'):
     os.makedirs('output_counts')
 
 # Get command line variables
-import sys
 hopf_count = int(sys.argv[1])
 fold_count = int(sys.argv[2])
 branch_count = int(sys.argv[3])
@@ -62,19 +62,20 @@ print('Using sigma_tilde value of {}'.format(sigma_tilde))
 
 
 # Total count of bifurcations in this batch
-total_count = hopf_count + fold_count + branch_count + null_h_count + null_f_count + null_b_count + 1    
+total_count = hopf_count + fold_count + branch_count + \
+    null_h_count + null_f_count + null_b_count + 1
 # Corresponding ID for naming time series file
 seq_id = total_count + (batch_num-1)*(4*bif_max)
 
 # Parameter labels
-parlabels_a = ['a'+str(i) for i in np.arange(1,11)]
-parlabels_b = ['b'+str(i) for i in np.arange(1,11)]
+parlabels_a = ['a'+str(i) for i in np.arange(1, 11)]
+parlabels_b = ['b'+str(i) for i in np.arange(1, 11)]
 parlabels = parlabels_a + parlabels_b
 
 
-#----------
+# ----------
 # Extract info from b.out files
-#–-------------
+# –-------------
 
 # Initiate list of models
 list_models = []
@@ -89,42 +90,40 @@ for j in range(len(parlabels)):
         continue
 
     model_temp = Model()
-    
+
     out = convert_bifdata('output_auto/b.out'+parlabels[j])
-        
+
     # Assign bifurcation properties to model object
     model_temp.bif_param = out['bif_param']
     model_temp.bif_type = out['type']
     model_temp.bif_value = out['value']
     model_temp.branch_vals = out['branch_vals']
 
-    
     # Import parameter values for the model
     with open('output_model/pars.csv') as csvfile:
         pars_raw = list(csv.reader(csvfile))
     par_list = [float(p[0]) for p in pars_raw]
-    par_dict = dict(zip(parlabels,par_list))
+    par_dict = dict(zip(parlabels, par_list))
     # Assign parameters to model object
     model_temp.pars = par_dict
-    
-    
+
     # Import equilibrium data as an array
     with open('output_model/equi.csv') as csvfile:
-        equi_raw = list(csv.reader(csvfile))   
-           
+        equi_raw = list(csv.reader(csvfile))
+
     equi_list = [float(e[0]) for e in equi_raw]
     equi_array = np.array(equi_list)
     # Assign equilibria to model object
     model_temp.equi_init = equi_array
-    
+
     # Import recovery rate
     with open('output_model/rrate.csv') as csvfile:
-        rrate_raw = list(csv.reader(csvfile))          
+        rrate_raw = list(csv.reader(csvfile))
     rrate = float(rrate_raw[0][0])
- 
+
     # Add model to list
     list_models.append(model_temp)
-    
+
 
 # Separate models into their bifurcation types
 hb_models = [model for model in list_models if model.bif_type == 'HB']
@@ -132,42 +131,40 @@ bp_models = [model for model in list_models if model.bif_type == 'BP']
 lp_models = [model for model in list_models if model.bif_type == 'LP']
 
 
+# -------------------
+# Simulate models
+# ------------------
 
-
-
-#-------------------
-## Simulate models
-#------------------
-    
 # Construct noise as in Methods
-rv_tri = np.random.triangular(0.75,1,1.25)
+rv_tri = np.random.triangular(0.75, 1, 1.25)
 # rv_tri = 1 # temporary
 sigma = np.sqrt(2*rrate) * sigma_tilde * rv_tri
 
 
 # Only simulate bifurcation types that have count below bif_max
 
-#Split bif total into 3 parts for different null trajectories
+# Split bif total into 3 parts for different null trajectories
 bif_null_totals = [bif_max//3, bif_max//3, bif_max-2*(bif_max//3)]
 # Create booleans
-[hopf_sim, fold_sim, branch_sim] = np.array([hopf_count, fold_count, branch_count]) < bif_max
-[null_h_sim, null_f_sim, null_b_sim] = np.array([null_h_count, null_f_count, null_b_count]) < bif_null_totals
-
+[hopf_sim, fold_sim, branch_sim] = np.array(
+    [hopf_count, fold_count, branch_count]) < bif_max
+[null_h_sim, null_f_sim, null_b_sim] = np.array(
+    [null_h_count, null_f_count, null_b_count]) < bif_null_totals
 
 
 print('Begin simulating model up to bifurcation points')
 # Loop through model configurations (different bifurcation params)
 for i in range(len(list_models)):
     model = list_models[i]
-    
+
     # Pick sample spacing randomly from [0.1,0.2,...,1]
-    dt_sample = np.random.choice(np.arange(1,11)/10)
+    dt_sample = np.random.choice(np.arange(1, 11)/10)
     # Define length of simulation
     # This is 200 points longer than ts_len
     # to increase the chance that we can extract ts_len data points prior to a transition
     # (transition can occur before the bifurcation is reached)
     series_len = ts_len + 200
-    
+
     # Simulate a null_h trajectory
     if null_h_sim and (model.bif_type == 'HB'):
         print('Simulating a Hopf Null trajectory with noise amplitude {}'.format(sigma))
@@ -187,7 +184,7 @@ for i in range(len(list_models)):
             df_label = pd.DataFrame([3])
             df_label.to_csv('output_labels/label'+str(seq_id)+'.csv',
                             header=False, index=False)
-            
+
             null_h_count += 1
             total_count += 1
             seq_id += 1
@@ -195,10 +192,8 @@ for i in range(len(list_models)):
             null_h_sim = False
             print('   Achieved {} steps - exporting'.format(ts_len))
         else:
-        	print('   Transitioned before {} steps - no export'.format(ts_len))
-        
+            print('   Transitioned before {} steps - no export'.format(ts_len))
 
-    
     # Simulate a null_f trajectory
     if null_f_sim and (model.bif_type == 'LP'):
         print('Simulating a Fold Null trajectory with noise amplitude {}'.format(sigma))
@@ -218,7 +213,7 @@ for i in range(len(list_models)):
             df_label = pd.DataFrame([3])
             df_label.to_csv('output_labels/label'+str(seq_id)+'.csv',
                             header=False, index=False)
-            
+
             null_f_count += 1
             total_count += 1
             seq_id += 1
@@ -226,11 +221,8 @@ for i in range(len(list_models)):
             null_f_sim = False
             print('   Achieved {} steps - exporting'.format(ts_len))
         else:
-        	print('   Transitioned before {} steps - no export'.format(ts_len))
+            print('   Transitioned before {} steps - no export'.format(ts_len))
 
-
-
-        
     # Simulate a null_b trajectory
     if null_b_sim and (model.bif_type == 'BP'):
         print('Simulating a Branch Null trajectory with noise amplitude {}'.format(sigma))
@@ -250,7 +242,7 @@ for i in range(len(list_models)):
             df_label = pd.DataFrame([3])
             df_label.to_csv('output_labels/label'+str(seq_id)+'.csv',
                             header=False, index=False)
-            
+
             null_b_count += 1
             total_count += 1
             seq_id += 1
@@ -258,7 +250,7 @@ for i in range(len(list_models)):
             null_b_sim = False
             print('   Achieved {} steps - exporting'.format(ts_len))
         else:
-        	print('   Transitioned before {} steps - no export'.format(ts_len))
+            print('   Transitioned before {} steps - no export'.format(ts_len))
 
     # Simulate a Hopf trajectory
     if hopf_sim and (model.bif_type == 'HB'):
@@ -278,7 +270,7 @@ for i in range(len(list_models)):
             df_label = pd.DataFrame([1])
             df_label.to_csv('output_labels/label'+str(seq_id)+'.csv',
                             header=False, index=False)
-            
+
             hopf_count += 1
             total_count += 1
             seq_id += 1
@@ -286,8 +278,8 @@ for i in range(len(list_models)):
             hopf_sim = False
             print('   Achieved {} steps - exporting'.format(ts_len))
         else:
-        	print('   Transitioned before {} steps - no export'.format(ts_len))
-            
+            print('   Transitioned before {} steps - no export'.format(ts_len))
+
     # Simulate a Fold trajectory
     if fold_sim and (model.bif_type == 'LP'):
         print('Simulating a Fold trajectory')
@@ -306,7 +298,7 @@ for i in range(len(list_models)):
             df_label = pd.DataFrame([0])
             df_label.to_csv('output_labels/label'+str(seq_id)+'.csv',
                             header=False, index=False)
-            
+
             fold_count += 1
             total_count += 1
             seq_id += 1
@@ -314,8 +306,7 @@ for i in range(len(list_models)):
             fold_sim = False
             print('   Achieved {} steps - exporting'.format(ts_len))
         else:
-        	print('   Transitioned before {} steps - no export'.format(ts_len))
-
+            print('   Transitioned before {} steps - no export'.format(ts_len))
 
     # Simulate a Branch point trajectory
     if branch_sim and (model.bif_type == 'BP'):
@@ -324,7 +315,7 @@ for i in range(len(list_models)):
                            sigma=sigma)
         # Detect transition point
         trans_time = trans_detect(df_out)
-        
+
         # Only if trans_time > ts_len, keep and cut trajectory
         if trans_time > ts_len:
             df_cut = df_out.loc[trans_time-ts_len:trans_time-1].reset_index()
@@ -336,7 +327,7 @@ for i in range(len(list_models)):
             df_label = pd.DataFrame([2])
             df_label.to_csv('output_labels/label'+str(seq_id)+'.csv',
                             header=False, index=False)
-            
+
             branch_count += 1
             total_count += 1
             seq_id += 1
@@ -344,20 +335,10 @@ for i in range(len(list_models)):
             branch_sim = False
             print('   Achieved {} steps - exporting'.format(ts_len))
         else:
-        	print('   Transitioned before {} steps - no export'.format(ts_len))
+            print('   Transitioned before {} steps - no export'.format(ts_len))
 
 print('Simulations finished\n')
 # Export updated counts of bifurcations for the bash script
-list_counts = np.array([hopf_count, fold_count, branch_count, null_h_count, null_f_count, null_b_count])
-np.savetxt('output_counts/list_counts.txt',list_counts, fmt='%i')
-    
-
-
-
-
-
-
-
-
-
-    
+list_counts = np.array([hopf_count, fold_count, branch_count,
+                       null_h_count, null_f_count, null_b_count])
+np.savetxt('output_counts/list_counts.txt', list_counts, fmt='%i')

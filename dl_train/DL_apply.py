@@ -35,10 +35,10 @@ both the left and right.  2 is the model trained on data censored on the left on
 
 
 # Filepath to residual time series to make predictions on 
-filepath = '../test_models/may_fold_1500/data/resids/may_fold_1500_resids.csv'
+filepath = '../test_models/may_fold_1500/data/resids/may_fold_1500_resids_1.csv'
 
 # Filepath to export ensemble DL predictions to
-filepath_out = '../test_models/may_fold_1500/data/ml_preds_test/ensemble_trend_probs_may_fold_forced_1_len1500.csv'
+filepath_out = '../test_models/may_fold_1500/data/ml_preds_mine/ensemble_trend_probs_may_fold_forced_1_len1500.csv'
 
 # Type of classifier to use (1500 or 500)
 ts_len=1500
@@ -78,7 +78,7 @@ def get_dl_predictions(resids, model_type, kk):
     '''
         
     # Setup file to store DL predictions
-    predictions_file_name = 'predictions/y_pred_{}_{}.csv'.format(kk,model_type)
+    predictions_file_name = 'y_pred_{}_{}.csv'.format(kk,model_type)
     f1 = open(predictions_file_name,'w')
 
     # Load in specific DL classifier
@@ -156,7 +156,7 @@ for model_type in [1,2]:
 list_df_preds = []
 for model_type in [1,2]:
     for kk in np.arange(1,11):
-        filename = 'predictions/y_pred_{}_{}.csv'.format(kk,model_type)
+        filename = 'y_pred_{}_{}.csv'.format(kk,model_type)
         df_preds = pd.read_csv(filename,header=None)
         df_preds['time_index'] = df_preds.index
         df_preds['model_type'] = model_type
